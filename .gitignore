@@ -1,0 +1,31 @@
+# Ignore project-specific cache and directories
+.gradle
+.vscode
+.settings
+.project
+
+# Ignore Gradle build output directory
+build
+
+# Default ignored files
+/shelf/
+/workspace.xml
+# Editor-based HTTP Client requests
+/httpRequests/
+# Datasource local storage ignored files
+/dataSources/
+/dataSources.local.xml
+/codeStyles/codeStyleConfig.xml
+/compiler.xml
+/vcs.xml
+/scala_compiler.xml
+/codeStyles/Project.xml
+/misc.xml
+/jarRepositories.xml
+/gradle.xml
+/.idea/.gitignore
+/.idea/workspace.xml
+/.idea/vcs.xml
+/.idea/.name
+/.idea/scala_compiler.xml
+/.idea/
