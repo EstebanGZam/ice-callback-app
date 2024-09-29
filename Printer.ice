@@ -1,13 +1,19 @@
 module Demo
 {
-    class Response{
+    class Response
+    {
         long responseTime;
         double throughput;
         double unprocessRate;
         string value;
     };
-    interface Printer
+    interface CallbackReceiver
     {
-        Response printString(string s);
+        void receiveMessage(string response);
+        void updateStats(Response response);
+    };
+    interface CallbackSender
+    {
+        void sendMessage(string s, CallbackReceiver* proxy);
     };
 };
