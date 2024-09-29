@@ -5,7 +5,7 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.text.DecimalFormat;
 
-public class PrinterI implements Demo.Printer {
+public class CallbackSenderI implements Demo.CallbackSender {
 
 	// Formateador de decimales para mostrar los resultados con dos decimales
 	private final DecimalFormat df = new DecimalFormat("#.00");
