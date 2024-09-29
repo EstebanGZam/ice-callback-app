@@ -7,14 +7,15 @@ import java.io.InputStreamReader;
 import java.text.DecimalFormat;
 import java.util.HashMap;
 import java.util.Map;
+import java.math.BigInteger;
 
 public class CallbackSenderI implements Demo.CallbackSender {
 
     // Lista para guardar los clientes conectados al servidor
     Map<String, CallbackReceiverPrx> clients = new HashMap<>();
 
-	// Formateador de decimales para mostrar los resultados con dos decimales
-	private final DecimalFormat df = new DecimalFormat("#.00");
+    // Formateador de decimales para mostrar los resultados con dos decimales
+    private final DecimalFormat df = new DecimalFormat("#.00");
 
     // Método principal que recibe un mensaje (s), lo procesa y devuelve una respuesta
     public void sendMessage(String s, CallbackReceiverPrx proxy, Current current) {
@@ -85,18 +86,15 @@ public class CallbackSenderI implements Demo.CallbackSender {
     // Método para verificar si un número es natural y generar una secuencia de Fibonacci y factores primos
     private static String checkIfNaturalNumber(int n) {
         if (n > 0) { // Verifica si el número es mayor que cero
-            if (n > 75) { // Verifica si es posible calcular la serie de fibonacci
-                return "El número es muy grande para calcular la serie de fibonacci";
-            }
             StringBuilder response = new StringBuilder(); // Builder para generar la respuesta
 
-			// Genera una secuencia de Fibonacci
-			long[] fibonacciArray = new long[n];
-			response.append("\nFibonacci (").append(n).append("): ");
-			for (int i = 0; i < n; i++) {
-				fibonacciArray[i] = fibonacci(i, new long[n]); // Llama al método recursivo de Fibonacci
-				response.append(fibonacciArray[i]).append(" "); // Agrega el número de Fibonacci a la respuesta
-			}
+            // Genera una secuencia de Fibonacci
+            BigInteger[] fibonacciArray = new BigInteger[n];
+            response.append("\nFibonacci (").append(n).append("): ");
+            for (int i = 0; i < n; i++) {
+                fibonacciArray[i] = fibonacci(i, new BigInteger[n]); // Llama al método recursivo de Fibonacci
+                response.append(fibonacciArray[i]).append(" "); // Agrega el número de Fibonacci a la respuesta
+            }
 
 			// Calcula los factores primos del número
 			response.append("\nPrime factors (").append(n).append("): ");
@@ -108,16 +106,16 @@ public class CallbackSenderI implements Demo.CallbackSender {
 		}
 	}
 
-	// Método recursivo para calcular el número de Fibonacci
-	public static long fibonacci(int num, long[] memo) {
-		if (num == 0 || num == 1) { // Casos base: Fibonacci de 0 es 0, y Fibonacci de 1 es 1
-			return num;
-		}
-		if (memo[num] == 0) { // Si no se ha calculado antes, lo calcula
-			memo[num] = fibonacci(num - 1, memo) + fibonacci(num - 2, memo); // Guarda el resultado en el arreglo
-		}
-		return memo[num]; // Devuelve el valor de Fibonacci
-	}
+    // Método recursivo para calcular el número de Fibonacci
+    public static BigInteger fibonacci(int num, BigInteger[] memo) {
+        if (num == 0 || num == 1) { // Casos base: Fibonacci de 0 es 0, y Fibonacci de 1 es 1
+            return BigInteger.valueOf(num);
+        }
+        if (memo[num] == null) { // Si no se ha calculado antes, lo calcula
+            memo[num] = fibonacci(num - 1, memo).add(fibonacci(num - 2, memo)); // Guarda el resultado en el arreglo
+        }
+        return memo[num]; // Devuelve el valor de Fibonacci
+    }
 
 	// Método para calcular los factores primos de un número
 	public static String calculatePrimeFactors(int n) {
