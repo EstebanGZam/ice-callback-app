@@ -1,17 +1,23 @@
+import Demo.CallbackReceiverPrx;
 import Demo.Response;
 import com.zeroc.Ice.Current;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.text.DecimalFormat;
+import java.util.HashMap;
+import java.util.Map;
 
 public class CallbackSenderI implements Demo.CallbackSender {
+
+    // Lista para guardar los clientes conectados al servidor
+    Map<String, CallbackReceiverPrx> clients = new HashMap<>();
 
 	// Formateador de decimales para mostrar los resultados con dos decimales
 	private final DecimalFormat df = new DecimalFormat("#.00");
 
-	// Método principal que recibe un mensaje (s), lo procesa y devuelve una respuesta de tipo Response
-	public Response printString(String s, Current current) {
+    // Método principal que recibe un mensaje (s), lo procesa y devuelve una respuesta
+    public void sendMessage(String s, CallbackReceiverPrx proxy, Current current) {
 		long processTime; // Variable para almacenar el tiempo de procesamiento
 		long start = System.currentTimeMillis(); // Registra el tiempo de inicio del procesamiento
 
@@ -24,6 +30,9 @@ public class CallbackSenderI implements Demo.CallbackSender {
 
 		// Divide el mensaje en dos partes separadas por "=>"
 		String[] msgArray = s.split("=>");
+
+        // La primera parte es la que registra el cliente junto con su proxy
+        registerClient(msgArray[0], proxy);
 
 		// La segunda parte del mensaje es la que se procesa
 		String message = msgArray[1];
@@ -48,9 +57,9 @@ public class CallbackSenderI implements Demo.CallbackSender {
 		// Acumula el tiempo total de procesamiento en el servidor
 		Server.setProcessTime(Server.getProcessTime() + processTime);
 
-		// Devuelve la respuesta final con el tiempo de procesamiento, throughput y tasa de solicitudes no procesadas
-		return new Response(processTime, calculateThroughput(), calculateUnprocessRate(), serverResponse);
-	}
+        // Devuelve la respuesta final con el tiempo de procesamiento, throughput y tasa de solicitudes no procesadas
+        proxy.updateStats(new Response(processTime, calculateThroughput(), calculateUnprocessRate(), serverResponse));
+    }
 
 	// Método para calcular la tasa de solicitudes no procesadas
 	private double calculateUnprocessRate() {
@@ -68,10 +77,18 @@ public class CallbackSenderI implements Demo.CallbackSender {
 		return throughput;
 	}
 
-	// Método para verificar si un número es natural y generar una secuencia de Fibonacci y factores primos
-	private static String checkIfNaturalNumber(int n) {
-		if (n > 0) { // Verifica si el número es mayor que cero
-			StringBuilder response = new StringBuilder(); // Builder para generar la respuesta
+    // Método para registrar un cliente en el servidor
+    private void registerClient(String hostname, CallbackReceiverPrx proxy) {
+        clients.putIfAbsent(hostname, proxy);
+    }
+
+    // Método para verificar si un número es natural y generar una secuencia de Fibonacci y factores primos
+    private static String checkIfNaturalNumber(int n) {
+        if (n > 0) { // Verifica si el número es mayor que cero
+            if (n > 75) { // Verifica si es posible calcular la serie de fibonacci
+                return "El número es muy grande para calcular la serie de fibonacci";
+            }
+            StringBuilder response = new StringBuilder(); // Builder para generar la respuesta
 
 			// Genera una secuencia de Fibonacci
 			long[] fibonacciArray = new long[n];
@@ -128,7 +145,13 @@ public class CallbackSenderI implements Demo.CallbackSender {
 				output = handleListPortsCommand(message); // Llama al método para manejar los puertos
 			} else if (message.startsWith("!")) { // Comando de shell, indicado por "!"
 				output = printCommand(message.substring(1).split("\\s+")); // Ejecuta el comando shell
-			} else {
+            } else if (message.startsWith("listclients")) { // Comando para obtener la lista de clientes conectados al servidor
+                output = "Clients: " + clients.keySet();
+            } else if (message.startsWith("to:")) { // Comando para enviar un mensaje a un cliente determinado
+                output = sendMessageToClient(message); // Llama al método para enviar el mensaje
+            } else if (message.startsWith("BC:")) { // Comando para enviar el mensaje de broadcast
+                output = broadCastMessage(message); // Llama al método para enviar el mensaje broadcast
+            } else {
 				throw new Exception("Invalid command: " + message);
 			}
 
@@ -167,5 +190,39 @@ public class CallbackSenderI implements Demo.CallbackSender {
 			return message; // Si no se encuentra una IP, devuelve el mensaje tal cual
 		}
 	}
+
+    // Método para enviar un mensaje a un cliente específico
+    private String sendMessageToClient(String message) {
+        String[] parts = message.substring(3).split(":");
+        if (parts.length == 2) {
+            String userName = parts[0];
+            String messageToSend = parts[1];
+            if (clients.containsKey(userName)) {
+                try {
+                    clients.get(userName)
+                            .receiveMessage("Message from to:" + messageToSend);
+                    return "Message sent to " + userName;
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            } else {
+                return "User not found";
+            }
+        }
+        return "Not valid format";
+    }
+
+    // Método para manejar el comando de broadcast
+    private String broadCastMessage(String message) {
+        String msg = message.substring(3);
+        for (String client : clients.keySet()) {
+            try {
+                clients.get(client).receiveMessage("Broadcast: " + msg);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        return "Broadcasting message to all clients";
+    }
 
 }

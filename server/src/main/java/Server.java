@@ -24,11 +24,11 @@ public class Server {
 				}
 			}
 
-			// Crea un adaptador de objetos Ice, usando el nombre "Printer" definido en la configuración
-			ObjectAdapter adapter = communicator.createObjectAdapter("Printer");
+			// Crea un adaptador de objetos Ice, usando el nombre "Callback.Sender" definido en la configuración
+			ObjectAdapter adapter = communicator.createObjectAdapter("Callback.Sender");
 
-			// Añade un objeto de tipo PrinterI al adaptador, asociándolo con la identidad "SimplePrinter"
-			adapter.add(new PrinterI(), Util.stringToIdentity("SimplePrinter"));
+			// Añade un objeto de tipo CallbackSenderI al adaptador, asociándolo con la identidad "callbackSender"
+			adapter.add(new CallbackSenderI(), Util.stringToIdentity("callbackSender"));
 
 			// Activa el adaptador para empezar a aceptar solicitudes
 			adapter.activate();
@@ -61,4 +61,5 @@ public class Server {
 	public static void setProcessTime(long processTime) {
 		Server.processTime = processTime;
 	}
+
 }
