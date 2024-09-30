@@ -8,6 +8,7 @@ import java.text.DecimalFormat;
 import java.util.HashMap;
 import java.util.Map;
 import java.math.BigInteger;
+import java.util.concurrent.CompletableFuture;
 
 public class CallbackSenderI implements Demo.CallbackSender {
 
@@ -19,47 +20,49 @@ public class CallbackSenderI implements Demo.CallbackSender {
 
     // Método principal que recibe un mensaje (s), lo procesa y devuelve una respuesta
     public void sendMessage(String s, CallbackReceiverPrx proxy, Current current) {
-		long processTime; // Variable para almacenar el tiempo de procesamiento
-		long start = System.currentTimeMillis(); // Registra el tiempo de inicio del procesamiento
+		CompletableFuture.runAsync(() -> {
+			long processTime; // Variable para almacenar el tiempo de procesamiento
+			long start = System.currentTimeMillis(); // Registra el tiempo de inicio del procesamiento
 
-		// Incrementa el contador de solicitudes totales en el servidor
-		Server.setTotalRequests(Server.getTotalRequests() + 1);
+			// Incrementa el contador de solicitudes totales en el servidor
+			Server.setTotalRequests(Server.getTotalRequests() + 1);
 
-		// Imprime un separador para cada nueva solicitud
-		System.out.println("====================================================================================");
-		System.out.println("Message: " + s); // Imprime el mensaje recibido
+			// Imprime un separador para cada nueva solicitud
+			System.out.println("====================================================================================");
+			System.out.println("Message: " + s); // Imprime el mensaje recibido
 
-		// Divide el mensaje en dos partes separadas por "=>"
-		String[] msgArray = s.split("=>");
+			// Divide el mensaje en dos partes separadas por "=>"
+			String[] msgArray = s.split("=>");
 
-        // La primera parte es la que registra el cliente junto con su proxy
-        registerClient(msgArray[0], proxy);
+			// La primera parte es la que registra el cliente junto con su proxy
+			registerClient(msgArray[0], proxy);
 
-		// La segunda parte del mensaje es la que se procesa
-		String message = msgArray[1];
-		String serverResponse; // Respuesta del servidor
+			// La segunda parte del mensaje es la que se procesa
+			String message = msgArray[1];
+			String serverResponse; // Respuesta del servidor
 
-		try {
-			// Intenta convertir el mensaje a un número y verifica si es un número natural
-			serverResponse = checkIfNaturalNumber(Integer.parseInt(message));
-		} catch (NumberFormatException e) {
-			// Si el mensaje no es un número, maneja la entrada no numérica
-			serverResponse = handleNonNumericInput(message);
-		}
+			try {
+				// Intenta convertir el mensaje a un número y verifica si es un número natural
+				serverResponse = checkIfNaturalNumber(Integer.parseInt(message));
+			} catch (NumberFormatException e) {
+				// Si el mensaje no es un número, maneja la entrada no numérica
+				serverResponse = handleNonNumericInput(message);
+			}
 
-		System.out.println(serverResponse); // Imprime la respuesta del servidor
+			System.out.println(serverResponse); // Imprime la respuesta del servidor
 
-		// Calcula el tiempo total de procesamiento
-		processTime = System.currentTimeMillis() - start;
+			// Calcula el tiempo total de procesamiento
+			processTime = System.currentTimeMillis() - start;
 
-		// Incrementa el contador de solicitudes resueltas en el servidor
-		Server.setResolvedRequests(Server.getResolvedRequests() + 1);
+			// Incrementa el contador de solicitudes resueltas en el servidor
+			Server.setResolvedRequests(Server.getResolvedRequests() + 1);
 
-		// Acumula el tiempo total de procesamiento en el servidor
-		Server.setProcessTime(Server.getProcessTime() + processTime);
+			// Acumula el tiempo total de procesamiento en el servidor
+			Server.setProcessTime(Server.getProcessTime() + processTime);
 
-        // Devuelve la respuesta final con el tiempo de procesamiento, throughput y tasa de solicitudes no procesadas
-        proxy.updateStats(new Response(processTime, calculateThroughput(), calculateUnprocessRate(), serverResponse));
+			// Devuelve la respuesta final con el tiempo de procesamiento, throughput y tasa de solicitudes no procesadas
+			proxy.updateStats(new Response(processTime, calculateThroughput(), calculateUnprocessRate(), serverResponse));
+		});
     }
 
 	// Método para calcular la tasa de solicitudes no procesadas
