@@ -127,6 +127,10 @@ public class Client {
 				try {
 					// Envia el mensaje al servidor y recibe la respuesta
                     sender.sendMessage(prefix + input, receiver);
+
+					// Espera a que la respuesta sea recibida en el callback
+					waitForResponse();
+
 					long latency = System.currentTimeMillis() - start; // Calcula la latencia
 					latencies.add(latency); // Agrega la latencia a la lista
 
@@ -144,6 +148,7 @@ public class Client {
 
 					// Muestra la respuesta del servidor y las métricas correspondientes
 					System.out.println("Server response: " + lastValue);
+					lastValue = "";
 					System.out.println("Processing time: " + processingTime + " ms");
 					System.out.println("Latency: " + latency + " ms");
 					System.out.println("Network Performance: " + netPerformance + " ms");
@@ -171,6 +176,7 @@ public class Client {
 					calculateJitter();
 					throughput.add(Double.NaN);
 					unprocessRates.add(Double.NaN);
+					lastValue = "";
 				}
 			}
 		}
@@ -207,6 +213,18 @@ public class Client {
 			System.out.printf("| %-51s | %12d | %22d | %22d | %11d | %16.2f | %18.2f | %10.2f |\n",
 					sentMessages.get(i), latencies.get(i), processingTimes.get(i), networkPerformance.get(i),
 					(i == 0 ? 0 : jitters.get(i - 1)), missingRates.get(i), unprocessRates.get(i), throughput.get(i));
+		}
+	}
+
+	private static void waitForResponse() {
+		// Implementa una espera activa o mecanismo para sincronizar con el callback
+		while (lastValue == null || lastValue.isEmpty()) {
+			// Espera hasta que la respuesta sea recibida
+			try {
+				Thread.sleep(50);
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+			}
 		}
 	}
 
