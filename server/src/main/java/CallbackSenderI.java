@@ -19,8 +19,9 @@ public class CallbackSenderI implements Demo.CallbackSender {
     private final DecimalFormat df = new DecimalFormat("#.00");
 
     // Método principal que recibe un mensaje (s), lo procesa y devuelve una respuesta
-    public void sendMessage(String s, CallbackReceiverPrx proxy, Current current) {
-		CompletableFuture.runAsync(() -> {
+	public synchronized void sendMessage(String s, CallbackReceiverPrx proxy, Current current) {
+		// Crea un CompletableFuture para procesar el mensaje de manera asíncrona
+		CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
 			long processTime; // Variable para almacenar el tiempo de procesamiento
 			long start = System.currentTimeMillis(); // Registra el tiempo de inicio del procesamiento
 
@@ -35,7 +36,8 @@ public class CallbackSenderI implements Demo.CallbackSender {
 			String[] msgArray = s.split("=>");
 
 			// La primera parte es la que registra el cliente junto con su proxy
-			registerClient(msgArray[0], proxy);
+			String[] clientArray = msgArray[0].split(":");
+			registerClient(clientArray[1], proxy);
 
 			// La segunda parte del mensaje es la que se procesa
 			String message = msgArray[1];
@@ -46,7 +48,7 @@ public class CallbackSenderI implements Demo.CallbackSender {
 				serverResponse = checkIfNaturalNumber(Integer.parseInt(message));
 			} catch (NumberFormatException e) {
 				// Si el mensaje no es un número, maneja la entrada no numérica
-				serverResponse = handleNonNumericInput(message);
+				serverResponse = handleNonNumericInput(message, clientArray[1]);
 			}
 
 			System.out.println(serverResponse); // Imprime la respuesta del servidor
@@ -136,7 +138,7 @@ public class CallbackSenderI implements Demo.CallbackSender {
 	}
 
 	// Método para manejar entradas no numéricas
-	private String handleNonNumericInput(String message) {
+	private String handleNonNumericInput(String message, String sender) {
 		String output; // Variable para almacenar el resultado
 		try {
 			if (message.startsWith("listifs")) { // Comando "listifs" para listar interfaces de red
@@ -149,9 +151,9 @@ public class CallbackSenderI implements Demo.CallbackSender {
             } else if (message.startsWith("listclients")) { // Comando para obtener la lista de clientes conectados al servidor
                 output = "Clients: " + clients.keySet();
             } else if (message.startsWith("to:")) { // Comando para enviar un mensaje a un cliente determinado
-                output = sendMessageToClient(message); // Llama al método para enviar el mensaje
+                output = sendMessageToClient(message, sender); // Llama al método para enviar el mensaje
             } else if (message.startsWith("BC:")) { // Comando para enviar el mensaje de broadcast
-                output = broadCastMessage(message); // Llama al método para enviar el mensaje broadcast
+                output = broadCastMessage(message, sender); // Llama al método para enviar el mensaje broadcast
             } else {
 				throw new Exception("Invalid command: " + message);
 			}
@@ -192,36 +194,30 @@ public class CallbackSenderI implements Demo.CallbackSender {
 		}
 	}
 
-    // Método para enviar un mensaje a un cliente específico
-    private String sendMessageToClient(String message) {
-        String[] parts = message.substring(3).split(":");
-        if (parts.length == 2) {
-            String userName = parts[0];
-            String messageToSend = parts[1];
-            if (clients.containsKey(userName)) {
-                try {
-                    clients.get(userName)
-                            .receiveMessage("Message from to:" + messageToSend);
-                    return "Message sent to " + userName;
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            } else {
-                return "User not found";
-            }
-        }
-        return "Not valid format";
-    }
+	// Método para enviar un mensaje a un cliente específico
+	private String sendMessageToClient(String message, String sender) {
+		String[] parts = message.substring(3).split(":"); // Dividimos el mensaje usando el delimitador ":"
+		if (parts.length == 2) {
+			String userName = parts[0]; // El nombre del cliente al que queremos enviar el mensaje
+			String messageToSend = parts[1]; // El mensaje que queremos enviar
+
+			if (clients.containsKey(userName)) { // Verificamos si el cliente está registrado
+				// Enviamos el mensaje al cliente especificado, añadiendo el nombre del remitente
+				clients.get(userName).receiveMessage("Message from [" + sender + "]: " + messageToSend);
+				return "Message sent to " + userName;
+			} else {
+				return "User not found";
+			}
+		}
+		return "Not a valid format. Use: to:Hostname:Message";
+	}
 
     // Método para manejar el comando de broadcast
-    private String broadCastMessage(String message) {
-        String msg = message.substring(3);
+    private String broadCastMessage(String message, String sender) {
+        String msg = message.substring(3); // Dividimos el mensaje
         for (String client : clients.keySet()) {
-            try {
-                clients.get(client).receiveMessage("Broadcast: " + msg);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
+			// Enviamos el mensaje broadcast
+			clients.get(client).receiveMessage("Broadcast from [" + sender + "]: " + msg);
         }
         return "Broadcasting message to all clients";
     }
