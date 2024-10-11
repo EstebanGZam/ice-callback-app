@@ -14,6 +14,8 @@ module Demo
     };
     interface CallbackSender
     {
-        void sendMessage(string s, CallbackReceiver* proxy);
+        void sendMessage(string message, CallbackReceiver* proxy);
+        void registerClient(string hostname, CallbackReceiver* proxy);
+        void removeClient(string name);
     };
 };

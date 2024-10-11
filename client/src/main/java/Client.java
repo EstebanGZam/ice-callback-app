@@ -2,11 +2,13 @@ import Demo.CallbackReceiverPrx;
 import Demo.CallbackSenderPrx;
 import com.zeroc.Ice.Communicator;
 import com.zeroc.Ice.ObjectAdapter;
+import com.zeroc.Ice.ObjectPrx;
 import com.zeroc.Ice.Util;
 
 import java.net.Inet4Address;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Scanner;
 
@@ -29,46 +31,52 @@ public class Client {
 	private static int successfulRequests = 0;
 	private static int totalRequests = 0;
 
-    // Variables a las que puede acceder el CallbackReceiverI
-    private static String lastValue;
-    private static long lastResponseTime = 0;
-    private static double lastThroughput = 0;
-    private static double lastUnprocessRate = 0;
+	// Variables a las que puede acceder el CallbackReceiverI
+	private static String lastValue;
+	private static long lastResponseTime = 0;
+	private static double lastThroughput = 0;
+	private static double lastUnprocessRate = 0;
 
-    public static void main(String[] args) {
-        List<String> extraArgs = new ArrayList<>();
-        // Inicializa el comunicador ICE y obtiene el proxy del servicio
-        try (Communicator communicator = Util.initialize(args, "client.cfg", extraArgs)) {
-            // Verifica y establece el proxy del servicio remoto
-            CallbackSenderPrx service = CallbackSenderPrx.checkedCast(communicator.propertyToProxy("CallbackSender.Proxy"))
-                    .ice_twoway().ice_timeout(-1).ice_secure(false);
-            if (service == null) {
-                throw new Error("Invalid proxy");
-            }
-            // Configuración del Cliente y lógica de interacción con el usuario
-            configureAndInteract(service, communicator);
-        } catch (UnknownHostException e) {
-            // Maneja posibles excepciones de red
-            throw new RuntimeException(e);
-        }
-    }
+	public static void main(String[] args) {
+		List<String> extraArgs = new ArrayList<>();
+		// Inicializa el comunicador ICE y obtiene el proxy del servicio
+		try (Communicator communicator = Util.initialize(args, "client.cfg", extraArgs)) {
+			// Verifica y establece el proxy del servicio remoto
+			CallbackSenderPrx service = CallbackSenderPrx.checkedCast(communicator.propertyToProxy("CallbackSender.Proxy"))
+					.ice_twoway().ice_timeout(-1).ice_secure(false);
+			System.out.println(service);
+			if (service == null) {
+				throw new Error("Invalid proxy");
+			}
+			// Configuración del Cliente y lógica de interacción con el usuario
+			configureAndInteract(service, communicator);
+		} catch (UnknownHostException e) {
+			// Maneja posibles excepciones de red
+			throw new RuntimeException(e);
+		}
+	}
 
-    private static void configureAndInteract(CallbackSenderPrx sender, Communicator communicator) throws UnknownHostException {
-        // Creación del adapter para el Cliente
-        ObjectAdapter adapter = communicator.createObjectAdapter("Callback.Client");
-        adapter.add(new CallbackReceiverI(), Util.stringToIdentity("callbackReceiver"));
-        adapter.activate();
+	private static void configureAndInteract(CallbackSenderPrx sender, Communicator communicator) throws UnknownHostException {
+		// Creación del adapter para el Cliente
+		ObjectAdapter adapter = communicator.createObjectAdapter("Callback.Client");
+		System.out.println("Adapter: " + Arrays.toString(adapter.getEndpoints()));
 
-        // Obtener el proxy del receptor para recibir mensajes del servidor
-        CallbackReceiverPrx receiver = CallbackReceiverPrx
-                .uncheckedCast(adapter.createProxy(Util.stringToIdentity("callbackReceiver")));
+		ObjectPrx proxy = adapter.add(new CallbackReceiverI(), Util.stringToIdentity("CallbackReceiver"));
+		adapter.activate();
 
-        // Interacción con el usuario
-        displayMenu(sender, receiver);
-    }
+		// Obtener el proxy del receptor para recibir mensajes del servidor
+		CallbackReceiverPrx receiver = CallbackReceiverPrx
+				.uncheckedCast(proxy);
+		System.out.println(receiver);
+
+		// Interacción con el usuario
+		displayMenu(sender, receiver);
+
+		communicator.waitForShutdown();
+	}
 
 	// Método que muestra el menú principal y gestiona las opciones seleccionadas por el usuario
-    private static void displayMenu(CallbackSenderPrx sender, CallbackReceiverPrx receiver) throws UnknownHostException {
+	private static void displayMenu(CallbackSenderPrx sender, CallbackReceiverPrx receiver) throws UnknownHostException {
 		boolean exit = false;
 		while (!exit) {
 			System.out.println("\n====================================================================================");
@@ -77,14 +85,14 @@ public class Client {
 			System.out.println("2. Generate performance report");
 			System.out.println("3. Exit");
 
-            // Solicita al usuario que elija una opción
-            System.out.print("Choose an option: ");
-            String choice = scanner.nextLine().trim();
+			// Solicita al usuario que elija una opción
+			System.out.print("Choose an option: ");
+			String choice = scanner.nextLine().trim();
 
 			// Ejecuta la acción correspondiente según la opción seleccionada
 			switch (choice) {
 				case "1":
-                    sendMessageToServer(sender, receiver); // Enviar un mensaje al servidor
+					sendMessageToServer(sender, receiver); // Enviar un mensaje al servidor
 					break;
 				case "2":
 					generateReport(); // Generar el informe de rendimiento
@@ -99,7 +107,7 @@ public class Client {
 	}
 
 	// Método que permite enviar un mensaje al servidor y recopila métricas de rendimiento
-    private static void sendMessageToServer(CallbackSenderPrx sender, CallbackReceiverPrx receiver) throws UnknownHostException {
+	private static void sendMessageToServer(CallbackSenderPrx sender, CallbackReceiverPrx receiver) throws UnknownHostException {
 		// Obtiene el nombre de usuario y el hostname de la máquina local
 		String username = System.getProperty("user.name").replace(" ", "").trim();
 		String hostname = Inet4Address.getLocalHost().getHostName().trim();
@@ -119,14 +127,15 @@ public class Client {
 			exit = input.equalsIgnoreCase("exit");
 			if (exit) {
 				System.out.println("Thank you for using our services. See you soon!");
+				sender.removeClient(hostname);
 			} else {
 				sentMessages.add(input); // Agrega el mensaje enviado a la lista
 
 				// Registra el tiempo de inicio del envío
 				long start = System.currentTimeMillis();
 				try {
-					// Envia el mensaje al servidor y recibe la respuesta
-                    sender.sendMessage(prefix + input, receiver);
+					// Envía el mensaje al servidor y recibe la respuesta
+					sender.sendMessage(prefix + input, receiver);
 
 					// Espera a que la respuesta sea recibida en el callback
 					waitForResponse();
@@ -135,7 +144,7 @@ public class Client {
 					latencies.add(latency); // Agrega la latencia a la lista
 
 					// Almacena el tiempo de procesamiento de la respuesta
-                    long processingTime = lastResponseTime;
+					long processingTime = lastResponseTime;
 					processingTimes.add(processingTime);
 
 					// Calcula el rendimiento de la red
@@ -143,8 +152,8 @@ public class Client {
 					networkPerformance.add(netPerformance);
 
 					// Almacena los valores de throughput y tasa de solicitudes no procesadas
-                    throughput.add(lastThroughput);
-                    unprocessRates.add(lastUnprocessRate);
+					throughput.add(lastThroughput);
+					unprocessRates.add(lastUnprocessRate);
 
 					// Muestra la respuesta del servidor y las métricas correspondientes
 					System.out.println("Server response: " + lastValue);
@@ -221,27 +230,27 @@ public class Client {
 		while (lastValue == null || lastValue.isEmpty()) {
 			// Espera hasta que la respuesta sea recibida
 			try {
-				Thread.sleep(50);
+				Thread.sleep(5);
 			} catch (InterruptedException e) {
 				Thread.currentThread().interrupt();
 			}
 		}
 	}
 
-    public static void setLastValue(String lastValue) {
-        Client.lastValue = lastValue;
-    }
+	public static void setLastValue(String lastValue) {
+		Client.lastValue = lastValue;
+	}
 
-    public static void setLastResponseTime(long lastResponseTime) {
-        Client.lastResponseTime = lastResponseTime;
-    }
+	public static void setLastResponseTime(long lastResponseTime) {
+		Client.lastResponseTime = lastResponseTime;
+	}
 
-    public static void setLastThroughput(double lastThroughput) {
-        Client.lastThroughput = lastThroughput;
-    }
+	public static void setLastThroughput(double lastThroughput) {
+		Client.lastThroughput = lastThroughput;
+	}
 
-    public static void setLastUnprocessRate(double lastUnprocessRate) {
-        Client.lastUnprocessRate = lastUnprocessRate;
-    }
+	public static void setLastUnprocessRate(double lastUnprocessRate) {
+		Client.lastUnprocessRate = lastUnprocessRate;
+	}
 
 }

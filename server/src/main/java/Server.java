@@ -28,7 +28,7 @@ public class Server {
 			ObjectAdapter adapter = communicator.createObjectAdapter("Callback.Sender");
 
 			// Añade un objeto de tipo CallbackSenderI al adaptador, asociándolo con la identidad "callbackSender"
-			adapter.add(new CallbackSenderI(), Util.stringToIdentity("callbackSender"));
+			adapter.add(new CallbackSenderI(), Util.stringToIdentity("CallbackSender"));
 
 			// Activa el adaptador para empezar a aceptar solicitudes
 			adapter.activate();
