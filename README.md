@@ -17,9 +17,9 @@ pérdida.
 El proyecto consta de dos componentes principales:
 
 1. **Servidor**: Recibe las solicitudes del cliente, las procesa y devuelve una respuesta. También calcula métricas como
-   el throughput y el unprocess rate.
+   el throughput y el unprocessed rate.
 
-2. **Cliente**: Envia solicitudes al servidor y muestra la respuesta. Recoge métricas como latencia, jitter, throughput,
+2. **Cliente**: Envía solicitudes al servidor y muestra la respuesta. Recoge métricas como latencia, jitter, throughput,
    y missing rate.
 
 ## **Tecnologías Utilizadas** 🛠️

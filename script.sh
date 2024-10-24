@@ -37,6 +37,13 @@ echo "Errores registrados en: $ERROR_LOG"
 echo "Respuestas registradas en: $RESPONSE_LOG"
 
 # Análisis simple de errores (cuántos timeouts hubo)
-TIMEOUT_COUNT=$(grep -c "timeout" "$ERROR_LOG")
+TIMEOUT_COUNT=$(grep -ci "timeout" "$ERROR_LOG")
+SOCKET_TIMEOUT_COUNT=$(grep -ci "SocketTimeoutException" "$ERROR_LOG")
+CONNECT_TIMEOUT_COUNT=$(grep -ci "ConnectTimeoutException" "$ERROR_LOG")
+READ_TIMEOUT_COUNT=$(grep -ci "ReadTimeoutException" "$ERROR_LOG")
 
+# Mostrar los resultados del análisis
 echo "Número de timeouts registrados: $TIMEOUT_COUNT"
+echo "SocketTimeoutExceptions: $SOCKET_TIMEOUT_COUNT"
+echo "ConnectTimeoutExceptions: $CONNECT_TIMEOUT_COUNT"
+echo "ReadTimeoutExceptions: $READ_TIMEOUT_COUNT"

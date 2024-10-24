@@ -1,8 +1,10 @@
 import Demo.CallbackReceiverPrx;
+import Demo.CallbackSender;
 import Demo.Response;
 import com.zeroc.Ice.Current;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.text.DecimalFormat;
 import java.util.HashMap;
@@ -10,7 +12,9 @@ import java.util.Map;
 import java.math.BigInteger;
 import java.util.concurrent.CompletableFuture;
 
-public class CallbackSenderI implements Demo.CallbackSender {
+import Demo.InvalidOperationError;
+
+public class CallbackSenderI implements CallbackSender {
 
 	// Lista para guardar los clientes conectados al servidor
 	Map<String, CallbackReceiverPrx> clients = new HashMap<>();
@@ -18,7 +22,8 @@ public class CallbackSenderI implements Demo.CallbackSender {
 	// Formateador de decimales para mostrar los resultados con dos decimales
 	private final DecimalFormat df = new DecimalFormat("#.00");
 
-	// Método principal que recibe un mensaje (message), lo procesa y devuelve una respuesta
+	// Método principal que recibe un mensaje (message), lo procesa y devuelve una
+	// respuesta
 	@Override
 	public void sendMessage(String message, CallbackReceiverPrx proxy, Current current) {
 		// Crea un CompletableFuture para procesar el mensaje de manera asíncrona
@@ -63,23 +68,28 @@ public class CallbackSenderI implements Demo.CallbackSender {
 			// Acumula el tiempo total de procesamiento en el servidor
 			Server.setProcessTime(Server.getProcessTime() + processTime);
 
-			// Devuelve la respuesta final con el tiempo de procesamiento, throughput y tasa de solicitudes no procesadas
-			proxy.updateStats(new Response(processTime, calculateThroughput(), calculateUnprocessRate(), serverResponse));
+			// Devuelve la respuesta final con el tiempo de procesamiento, throughput y tasa
+			// de solicitudes no procesadas
+			proxy.updateStats(
+					new Response(processTime, calculateThroughput(), calculateUnprocessedRate(), serverResponse));
 		});
 	}
 
 	// Método para calcular la tasa de solicitudes no procesadas
-	private double calculateUnprocessRate() {
+	private double calculateUnprocessedRate() {
 		// Calcula la tasa de solicitudes no procesadas como porcentaje
-		double unprocessRate = (Server.getTotalRequests() - Server.getResolvedRequests()) / (double) Server.getTotalRequests() * 100;
-		System.out.println("Unprocess Rate: " + df.format(unprocessRate) + " %");
-		return unprocessRate;
+		double unprocessedRate = (Server.getTotalRequests() - Server.getResolvedRequests())
+				/ (double) Server.getTotalRequests() * 100;
+		System.out.println("Unprocess Rate: " + df.format(unprocessedRate) + " %");
+		return unprocessedRate;
 	}
 
 	// Método para calcular el throughput (número de solicitudes por segundo)
 	private double calculateThroughput() {
-		// Si el tiempo de procesamiento total es cero, el throughput es NaN, de lo contrario, se calcula el throughput
-		double throughput = Server.getProcessTime() == 0 ? Double.NaN : Server.getTotalRequests() / ((double) Server.getProcessTime() / 1000.0);
+		// Si el tiempo de procesamiento total es cero, el throughput es NaN, de lo
+		// contrario, se calcula el throughput
+		double throughput = Server.getProcessTime() == 0 ? Double.NaN
+				: Server.getTotalRequests() / ((double) Server.getProcessTime() / 1000.0);
 		System.out.println("Throughput: " + df.format(throughput) + " request/s");
 		return throughput;
 	}
@@ -92,7 +102,8 @@ public class CallbackSenderI implements Demo.CallbackSender {
 			System.out.println("Client " + hostname + " connected.");
 	}
 
-	// Método para verificar si un número es natural y generar una secuencia de Fibonacci y factores primos
+	// Método para verificar si un número es natural y generar una secuencia de
+	// Fibonacci y factores primos
 	private static String checkIfNaturalNumber(int n) {
 		if (n > 0) { // Verifica si el número es mayor que cero
 			StringBuilder response = new StringBuilder(); // Builder para generar la respuesta
@@ -143,40 +154,47 @@ public class CallbackSenderI implements Demo.CallbackSender {
 
 	// Método para manejar entradas no numéricas
 	private String handleNonNumericInput(String message, String sender) {
-		String output; // Variable para almacenar el resultado
+		String output = ""; // Variable para almacenar el resultado
 		System.out.println("Command: " + message);
 		try {
 			if (message.startsWith("listifs")) { // Comando "listifs" para listar interfaces de red
 				String os = System.getProperty("os.name").toLowerCase(); // Obtiene el nombre del sistema operativo
-				output = printCommand(new String[]{os.contains("win") ? "ipconfig" : "ifconfig"}); // Ejecuta el comando correspondiente según el sistema operativo
+				output = printCommand(new String[] { os.contains("win") ? "ipconfig" : "ifconfig" }); // Ejecuta el
+																										// comando
+																										// correspondiente
+																										// según el
+																										// sistema
+																										// operativo
 			} else if (message.startsWith("listports")) { // Comando "listports" para listar puertos
 				output = handleListPortsCommand(message); // Llama al método para manejar los puertos
 			} else if (message.startsWith("!")) { // Comando de shell, indicado por "!"
 				output = printCommand(message.substring(1).split("\\s+")); // Ejecuta el comando shell
-			} else if (message.startsWith("listclients")) { // Comando para obtener la lista de clientes conectados al servidor
+			} else if (message.startsWith("listclients")) { // Comando para obtener la lista de clientes conectados al
+															// servidor
 				output = "Clients: " + clients.keySet();
 			} else if (message.startsWith("to:")) { // Comando para enviar un mensaje a un cliente determinado
 				output = sendMessageToClient(message, sender); // Llama al método para enviar el mensaje
 			} else if (message.startsWith("BC:")) { // Comando para enviar el mensaje de broadcast
 				output = broadCastMessage(message, sender); // Llama al método para enviar el mensaje broadcast
 			} else {
-				throw new Exception("Invalid command: " + message);
+				throw new InvalidOperationError("Invalid command: " + message);
 			}
-
-		} catch (Exception errorConsole) {
-			// Si hay un error, se devuelve una excepción que indica que la solicitud no se procesó correctamente
-			throw new RuntimeException(errorConsole.getMessage());
+		} catch (IOException | InterruptedException | InvalidOperationError ex) {
+			output = (ex instanceof InvalidOperationError) ? ((InvalidOperationError) ex).reason
+					: "Invalid command, please try again.";
+			System.err.println(ex.getMessage());
 		}
 		return output; // Devuelve el resultado
 	}
 
 	// Método para ejecutar comandos de shell
-	private static String printCommand(String[] command) throws Exception {
+	private static String printCommand(String[] command) throws IOException, InterruptedException {
 		ProcessBuilder processBuilder = new ProcessBuilder(command); // Crea un nuevo proceso con el comando
 		processBuilder.redirectErrorStream(true); // Redirige los errores a la salida estándar
 
 		Process process = processBuilder.start(); // Inicia el proceso
-		BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream())); // Lee la salida del proceso
+		BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream())); // Lee la salida
+																										// del proceso
 
 		String line; // Variable para almacenar las líneas de salida
 		StringBuilder series = new StringBuilder(); // Builder para construir la salida completa
@@ -187,13 +205,14 @@ public class CallbackSenderI implements Demo.CallbackSender {
 		return series.toString(); // Devuelve la salida completa del comando
 	}
 
-	// Método para manejar el comando "listports", que utiliza nmap para escanear puertos
-	private String handleListPortsCommand(String message) throws Exception {
+	// Método para manejar el comando "listports", que utiliza nmap para escanear
+	// puertos
+	private String handleListPortsCommand(String message) throws IOException, InterruptedException {
 		int pos = message.indexOf("listports"); // Encuentra la posición del comando "listports"
 		if (pos != -1) {
 			String ip = message.substring(pos + "listports".length()).trim(); // Extrae la dirección IP del mensaje
 			System.out.println(ip);
-			return printCommand(new String[]{"nmap", ip}); // Ejecuta el comando nmap con la IP
+			return printCommand(new String[] { "nmap", ip }); // Ejecuta el comando nmap con la IP
 		} else {
 			return message; // Si no se encuentra una IP, devuelve el mensaje tal cual
 		}
@@ -207,7 +226,8 @@ public class CallbackSenderI implements Demo.CallbackSender {
 			String messageToSend = parts[1]; // El mensaje que queremos enviar
 
 			if (clients.containsKey(userName)) { // Verificamos si el cliente está registrado
-				// Enviamos el mensaje al cliente especificado, añadiendo el nombre del remitente
+				// Enviamos el mensaje al cliente especificado, añadiendo el nombre del
+				// remitente
 				clients.get(userName).receiveMessage("Message from [" + sender + "]: " + messageToSend);
 				return "Message sent to " + userName;
 			} else {

@@ -9,10 +9,12 @@ public class Server {
 	private static long processTime = 0;
 
 	public static void main(String[] args) {
-		// Lista para almacenar argumentos extra que se puedan pasar durante la ejecución del servidor
+		// Lista para almacenar argumentos extra que se puedan pasar durante la
+		// ejecución del servidor
 		java.util.List<String> extraArgs = new java.util.ArrayList<>();
 
-		// Bloque try-with-resources para inicializar el comunicador Ice y garantizar su cierre
+		// Bloque try-with-resources para inicializar el comunicador Ice y garantizar su
+		// cierre
 		try (Communicator communicator = Util.initialize(args, "server.cfg", extraArgs)) {
 
 			// Si hay argumentos adicionales no reconocidos, imprime un error
@@ -24,10 +26,12 @@ public class Server {
 				}
 			}
 
-			// Crea un adaptador de objetos Ice, usando el nombre "Callback.Sender" definido en la configuración
+			// Crea un adaptador de objetos Ice, usando el nombre "Callback.Sender" definido
+			// en la configuración
 			ObjectAdapter adapter = communicator.createObjectAdapter("Callback.Sender");
 
-			// Añade un objeto de tipo CallbackSenderI al adaptador, asociándolo con la identidad "callbackSender"
+			// Añade un objeto de tipo CallbackSenderI al adaptador, asociándolo con la
+			// identidad "callbackSender"
 			adapter.add(new CallbackSenderI(), Util.stringToIdentity("CallbackSender"));
 
 			// Activa el adaptador para empezar a aceptar solicitudes

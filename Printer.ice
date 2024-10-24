@@ -4,8 +4,11 @@ module Demo
     {
         long responseTime;
         double throughput;
-        double unprocessRate;
+        double unprocessedRate;
         string value;
+    };
+    exception InvalidOperationError {
+        string reason;
     };
     interface CallbackReceiver
     {

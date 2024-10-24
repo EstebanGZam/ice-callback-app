@@ -13,7 +13,7 @@ public class CallbackReceiverI implements Demo.CallbackReceiver {
         Client.setLastValue(response.value);
         Client.setLastResponseTime(response.responseTime);
         Client.setLastThroughput(response.throughput);
-        Client.setLastUnprocessRate(response.unprocessRate);
+        Client.setLastUnprocessedRate(response.unprocessedRate);
     }
 
 }
