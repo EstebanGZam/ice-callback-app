@@ -10,7 +10,6 @@ import java.text.DecimalFormat;
 import java.util.HashMap;
 import java.util.Map;
 import java.math.BigInteger;
-import java.util.concurrent.CompletableFuture;
 
 import Demo.InvalidOperationError;
 
@@ -25,54 +24,56 @@ public class CallbackSenderI implements CallbackSender {
 	// Método principal que recibe un mensaje (message), lo procesa y devuelve una
 	// respuesta
 	@Override
-	public void sendMessage(String message, CallbackReceiverPrx proxy, Current current) {
+	public Response sendMessage(String message, CallbackReceiverPrx proxy, Current current) {
 		// Crea un CompletableFuture para procesar el mensaje de manera asíncrona
-		CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
-			long processTime; // Variable para almacenar el tiempo de procesamiento
-			long start = System.currentTimeMillis(); // Registra el tiempo de inicio del procesamiento
+		// CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+		long processTime; // Variable para almacenar el tiempo de procesamiento
+		long start = System.currentTimeMillis(); // Registra el tiempo de inicio del procesamiento
 
-			// Incrementa el contador de solicitudes totales en el servidor
-			Server.setTotalRequests(Server.getTotalRequests() + 1);
+		// Incrementa el contador de solicitudes totales en el servidor
+		Server.setTotalRequests(Server.getTotalRequests() + 1);
 
-			// Imprime un separador para cada nueva solicitud
-			System.out.println("====================================================================================");
-			System.out.println("Message: " + message); // Imprime el mensaje recibido
+		// Imprime un separador para cada nueva solicitud
+		System.out.println("====================================================================================");
+		System.out.println("Message: " + message); // Imprime el mensaje recibido
 
-			// Divide el mensaje en dos partes separadas por "=>"
-			String[] msgArray = message.split("=>");
+		// Divide el mensaje en dos partes separadas por "=>"
+		String[] msgArray = message.split("=>");
 
-			// La primera parte es la que registra el cliente junto con su proxy
-			String[] clientArray = msgArray[0].split(":");
-			registerClient(clientArray[1], proxy, current);
+		// La primera parte es la que registra el cliente junto con su proxy
+		String[] clientArray = msgArray[0].split(":");
+		registerClient(clientArray[1], proxy, current);
 
-			// La segunda parte del mensaje es la que se procesa
-			String messageToSend = msgArray[1];
-			String serverResponse; // Respuesta del servidor
+		// La segunda parte del mensaje es la que se procesa
+		String messageToSend = msgArray[1];
+		String serverResponse; // Respuesta del servidor
 
-			try {
-				// Intenta convertir el mensaje a un número y verifica si es un número natural
-				serverResponse = checkIfNaturalNumber(Integer.parseInt(messageToSend));
-			} catch (NumberFormatException e) {
-				// Si el mensaje no es un número, maneja la entrada no numérica
-				serverResponse = handleNonNumericInput(messageToSend, clientArray[1]);
-			}
+		try {
+			// Intenta convertir el mensaje a un número y verifica si es un número natural
+			serverResponse = checkIfNaturalNumber(Integer.parseInt(messageToSend));
+		} catch (NumberFormatException e) {
+			// Si el mensaje no es un número, maneja la entrada no numérica
+			serverResponse = handleNonNumericInput(messageToSend, clientArray[1]);
+		}
 
-			System.out.println(serverResponse); // Imprime la respuesta del servidor
+		System.out.println(serverResponse); // Imprime la respuesta del servidor
 
-			// Calcula el tiempo total de procesamiento
-			processTime = System.currentTimeMillis() - start;
+		// Calcula el tiempo total de procesamiento
+		processTime = System.currentTimeMillis() - start;
 
-			// Incrementa el contador de solicitudes resueltas en el servidor
-			Server.setResolvedRequests(Server.getResolvedRequests() + 1);
+		// Incrementa el contador de solicitudes resueltas en el servidor
+		Server.setResolvedRequests(Server.getResolvedRequests() + 1);
 
-			// Acumula el tiempo total de procesamiento en el servidor
-			Server.setProcessTime(Server.getProcessTime() + processTime);
+		// Acumula el tiempo total de procesamiento en el servidor
+		Server.setProcessTime(Server.getProcessTime() + processTime);
 
-			// Devuelve la respuesta final con el tiempo de procesamiento, throughput y tasa
-			// de solicitudes no procesadas
-			proxy.updateStats(
-					new Response(processTime, calculateThroughput(), calculateUnprocessedRate(), serverResponse));
-		});
+		// Devuelve la respuesta final con el tiempo de procesamiento, throughput y tasa
+		// de solicitudes no procesadas
+		// proxy.updateStats(
+		// new Response(processTime, calculateThroughput(), calculateUnprocessedRate(),
+		// serverResponse));
+		// });
+		return new Response(processTime, calculateThroughput(), calculateUnprocessedRate(), serverResponse);
 	}
 
 	// Método para calcular la tasa de solicitudes no procesadas
@@ -80,7 +81,7 @@ public class CallbackSenderI implements CallbackSender {
 		// Calcula la tasa de solicitudes no procesadas como porcentaje
 		double unprocessedRate = (Server.getTotalRequests() - Server.getResolvedRequests())
 				/ (double) Server.getTotalRequests() * 100;
-		System.out.println("Unprocess Rate: " + df.format(unprocessedRate) + " %");
+		System.out.println("Unprocessed Rate: " + df.format(unprocessedRate) + " %");
 		return unprocessedRate;
 	}
 
@@ -159,12 +160,8 @@ public class CallbackSenderI implements CallbackSender {
 		try {
 			if (message.startsWith("listifs")) { // Comando "listifs" para listar interfaces de red
 				String os = System.getProperty("os.name").toLowerCase(); // Obtiene el nombre del sistema operativo
-				output = printCommand(new String[] { os.contains("win") ? "ipconfig" : "ifconfig" }); // Ejecuta el
-																										// comando
-																										// correspondiente
-																										// según el
-																										// sistema
-																										// operativo
+				// Ejecuta el comando correspondiente según el sistema operativo
+				output = printCommand(new String[] { os.contains("win") ? "ipconfig" : "ifconfig" });
 			} else if (message.startsWith("listports")) { // Comando "listports" para listar puertos
 				output = handleListPortsCommand(message); // Llama al método para manejar los puertos
 			} else if (message.startsWith("!")) { // Comando de shell, indicado por "!"

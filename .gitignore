@@ -670,7 +670,6 @@ MigrationBackup/
 .ionide/
 
 ### Gradle ###
-.gradle
 **/build/
 !src/**/build/
 
@@ -688,7 +687,6 @@ gradle-app.setting
 
 # Eclipse Gradle plugin generated files
 # Eclipse Core
-.project
 # JDT-specific (Eclipse Java Development Tools)
 .classpath
 
@@ -698,7 +696,6 @@ gradle-app.setting
 
 # End of https://www.toptal.com/developers/gitignore/api/java,oxygenxmleditor,intellij,intellij+all,intellij+iml,gradle,vs,visualstudiocode
 /server/bin/
-/client/bin/
 /client/bin/
 client/bin/main/Client.class
 server/bin/main/Demo/Response.class

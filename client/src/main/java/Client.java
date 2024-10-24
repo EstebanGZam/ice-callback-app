@@ -31,12 +31,6 @@ public class Client {
 	private static int successfulRequests = 0;
 	private static int totalRequests = 0;
 
-	// Variables a las que puede acceder el CallbackReceiverI
-	private static String lastValue;
-	private static long lastResponseTime = 0;
-	private static double lastThroughput = 0;
-	private static double lastUnprocessedRate = 0;
-
 	public static void main(String[] args) {
 		List<String> extraArgs = new ArrayList<>();
 		// Inicializa el comunicador ICE y obtiene el proxy del servicio
@@ -72,14 +66,14 @@ public class Client {
 		System.out.println(receiver);
 
 		// Interacción con el usuario
-		displayMenu(sender, receiver);
+		displayMenu(sender, receiver, communicator);
 
 		communicator.waitForShutdown();
 	}
 
 	// Método que muestra el menú principal y gestiona las opciones seleccionadas
 	// por el usuario
-	private static void displayMenu(CallbackSenderPrx sender, CallbackReceiverPrx receiver)
+	private static void displayMenu(CallbackSenderPrx sender, CallbackReceiverPrx receiver, Communicator communicator)
 			throws UnknownHostException {
 		boolean exit = false;
 		while (!exit) {
@@ -97,13 +91,14 @@ public class Client {
 			// Ejecuta la acción correspondiente según la opción seleccionada
 			switch (choice) {
 				case "1":
-					sendMessageToServer(sender, receiver); // Enviar un mensaje al servidor
+					sendMessageToServerAsync(sender, receiver); // Enviar un mensaje al servidor
 					break;
 				case "2":
 					generateReport(); // Generar el informe de rendimiento
 					break;
 				case "3":
 					exit = true; // Salir del programa
+					communicator.shutdown(); // Cierra el comunicador
 					break;
 				default:
 					System.out.println("Invalid option. Please try again.");
@@ -113,7 +108,7 @@ public class Client {
 
 	// Método que permite enviar un mensaje al servidor y recopila métricas de
 	// rendimiento
-	private static void sendMessageToServer(CallbackSenderPrx sender, CallbackReceiverPrx receiver)
+	private static void sendMessageToServerAsync(CallbackSenderPrx sender, CallbackReceiverPrx receiver)
 			throws UnknownHostException {
 		// Obtiene el nombre de usuario y el hostname de la máquina local
 		String username = System.getProperty("user.name").replace(" ", "").trim();
@@ -122,7 +117,6 @@ public class Client {
 		boolean exit = false;
 		while (!exit) {
 			String prefix = username + ":" + hostname + "=>"; // Prefijo para el mensaje
-			System.out.println("====================================================================================");
 			String input;
 			do {
 				// Solicita al usuario que ingrese un mensaje
@@ -138,44 +132,50 @@ public class Client {
 			} else {
 				sentMessages.add(input); // Agrega el mensaje enviado a la lista
 
-				// Registra el tiempo de inicio del envío
-				long start = System.currentTimeMillis();
 				// Envía el mensaje al servidor y recibe la respuesta
-				sender.sendMessage(prefix + input, receiver);
+				sender.sendMessageAsync(prefix + input, receiver).thenAccept(
+						response -> {
+							System.out.println(
+									"\n====================================================================================");
+							// Registra el tiempo de inicio del envío
+							long start = System.currentTimeMillis();
+							long latency = System.currentTimeMillis() - start; // Calcula la latencia
+							latencies.add(latency); // Agrega la latencia a la lista
 
-				// Espera a que la respuesta sea recibida en el callback
-				waitForResponse();
+							// Almacena el tiempo de procesamiento de la respuesta
+							long processingTime = response.responseTime;
+							processingTimes.add(processingTime);
 
-				long latency = System.currentTimeMillis() - start; // Calcula la latencia
-				latencies.add(latency); // Agrega la latencia a la lista
+							// Calcula el rendimiento de la red
+							long netPerformance = latency - processingTime;
+							networkPerformance.add(netPerformance);
 
-				// Almacena el tiempo de procesamiento de la respuesta
-				long processingTime = lastResponseTime;
-				processingTimes.add(processingTime);
+							// Almacena los valores de throughput y tasa de solicitudes no procesadas
+							throughput.add(response.throughput);
+							unprocessedRates.add(response.unprocessedRate);
 
-				// Calcula el rendimiento de la red
-				long netPerformance = latency - processingTime;
-				networkPerformance.add(netPerformance);
+							// Muestra la respuesta del servidor y las métricas correspondientes
+							System.out.println("Server response: \n" + response.value + "\n");
+							System.out.print("latency = " + latency + "ms, ");
+							// Calcula el jitter si hay más de una medición de latencia
+							if (latencies.size() > 1) {
+								long jitter = calculateJitter();
+								System.out.print("jitter = " + jitter + "ms, ");
+							}
+							System.out.print("processing time = " + processingTime + "ms, ");
+							System.out.println("network performance = " + netPerformance + "ms");
 
-				// Almacena los valores de throughput y tasa de solicitudes no procesadas
-				throughput.add(lastThroughput);
-				unprocessedRates.add(lastUnprocessedRate);
-
-				// Muestra la respuesta del servidor y las métricas correspondientes
-				System.out.println("Server response: " + lastValue + "\n");
-				lastValue = "";
-				System.out.print("latency = " + latency + "ms, ");
-				// Calcula el jitter si hay más de una medición de latencia
-				if (latencies.size() > 1) {
-					long jitter = calculateJitter();
-					System.out.print("jitter = " + jitter + "ms, ");
-				}
-				System.out.print("processing time = " + processingTime + "ms, ");
-				System.out.println("network performance = " + netPerformance + "ms");
-
-				// Incrementa los contadores de solicitudes exitosas y totales
-				successfulRequests++;
-				totalRequests++;
+							// Incrementa los contadores de solicitudes exitosas y totales
+							successfulRequests++;
+							totalRequests++;
+							System.out.println(
+									"====================================================================================");
+							System.out.print(prefix);
+						})
+						.exceptionally(ex -> {
+							System.err.println("Error sending message: \n" + ex.getMessage());
+							return null;
+						});
 			}
 		}
 	}
@@ -193,17 +193,18 @@ public class Client {
 	}
 
 	// Método que calcula la tasa de solicitudes no recibidas
-	private static double calculateMissingRate() {
-		// // Calcula el porcentaje de solicitudes fallidas
-		// double missingRate = (double) (totalRequests - successfulRequests) /
-		// totalRequests * 100;
-		// missingRates.add(missingRate); // Almacena el valor de la tasa de solicitudes
-		// fallidas
-		// return missingRate;
-		//// System.out.println("Missing Rate: " + missingRate + " %");
-		// }
-		return 0.0;
-	}
+	// private static double calculateMissingRate() {
+	// // // Calcula el porcentaje de solicitudes fallidas
+	// // double missingRate = (double) (totalRequests - successfulRequests) /
+	// // totalRequests * 100;
+	// // missingRates.add(missingRate); // Almacena el valor de la tasa de
+	// solicitudes
+	// // fallidas
+	// // return missingRate;
+	// //// System.out.println("Missing Rate: " + missingRate + " %");
+	// // }
+	// return 0.0;
+	// }
 
 	// Método para generar un informe de rendimiento con las métricas recogidas
 	private static void generateReport() {
@@ -219,34 +220,6 @@ public class Client {
 					sentMessages.get(i), latencies.get(i), processingTimes.get(i), networkPerformance.get(i),
 					(i == 0 ? 0 : jitters.get(i - 1)), missingRates.get(i), unprocessedRates.get(i), throughput.get(i));
 		}
-	}
-
-	private static void waitForResponse() {
-		// Implementa una espera activa o mecanismo para sincronizar con el callback
-		while (lastValue == null || lastValue.isEmpty()) {
-			// Espera hasta que la respuesta sea recibida
-			try {
-				Thread.sleep(5);
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-			}
-		}
-	}
-
-	public static void setLastValue(String lastValue) {
-		Client.lastValue = lastValue;
-	}
-
-	public static void setLastResponseTime(long lastResponseTime) {
-		Client.lastResponseTime = lastResponseTime;
-	}
-
-	public static void setLastThroughput(double lastThroughput) {
-		Client.lastThroughput = lastThroughput;
-	}
-
-	public static void setLastUnprocessedRate(double lastUnprocessedRate) {
-		Client.lastUnprocessedRate = lastUnprocessedRate;
 	}
 
 }
