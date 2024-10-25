@@ -22,7 +22,6 @@ public class Client {
 	private static final List<Long> processingTimes = new ArrayList<>();
 	private static final List<Long> networkPerformance = new ArrayList<>();
 	private static final List<Long> jitters = new ArrayList<>();
-	private static final List<Double> missingRates = new ArrayList<>();
 	private static final List<String> sentMessages = new ArrayList<>();
 	private static final List<Double> unprocessedRates = new ArrayList<>();
 	private static final List<Double> throughput = new ArrayList<>();
@@ -38,7 +37,7 @@ public class Client {
 			// Verifica y establece el proxy del servicio remoto
 			CallbackSenderPrx service = CallbackSenderPrx
 					.checkedCast(communicator.propertyToProxy("CallbackSender.Proxy"))
-					.ice_twoway().ice_timeout(-1).ice_secure(false);
+					.ice_twoway().ice_secure(false);
 			System.out.println(service);
 			if (service == null) {
 				throw new Error("Invalid proxy");
@@ -131,49 +130,57 @@ public class Client {
 				sender.removeClient(hostname);
 			} else {
 				sentMessages.add(input); // Agrega el mensaje enviado a la lista
-
 				// Envía el mensaje al servidor y recibe la respuesta
-				sender.sendMessageAsync(prefix + input, receiver).thenAccept(
-						response -> {
+				sender.sendMessageAsync(prefix + input, System.currentTimeMillis(), receiver)
+						.thenAccept(
+								response -> {
+									System.out.println(
+											"\n====================================================================================");
+									// Calcula la latencia
+									long latency = System.currentTimeMillis() - response.startTime;
+									latencies.add(latency); // Agrega la latencia a la lista
+
+									// Almacena el tiempo de procesamiento de la respuesta
+									long processingTime = response.responseTime;
+									processingTimes.add(processingTime);
+
+									// Calcula el rendimiento de la red
+									long netPerformance = latency - processingTime;
+									networkPerformance.add(netPerformance);
+
+									// Almacena los valores de throughput y tasa de solicitudes no procesadas
+									throughput.add(response.throughput);
+									unprocessedRates.add(response.unprocessedRate);
+
+									// Muestra la respuesta del servidor y las métricas correspondientes
+									System.out.println("Server response: \n" + response.value + "\n");
+									System.out.print("latency = " + latency + "ms, ");
+									// Calcula el jitter si hay más de una medición de latencia
+									if (latencies.size() > 1) {
+										long jitter = calculateJitter();
+										System.out.print("jitter = " + jitter + "ms, ");
+									}
+									System.out.print("processing time = " + processingTime + "ms, ");
+									System.out.print("network performance = " + netPerformance + "ms, ");
+									System.out.println("throughput = " + response.throughput + " requests/sec");
+
+									// Incrementa los contadores de solicitudes exitosas y totales
+									successfulRequests++;
+									totalRequests++; // Incrementa el contador de solicitudes totales
+									System.out.println(
+											"====================================================================================");
+									System.out.print(prefix);
+								})
+						.exceptionally(ex -> {
+							totalRequests++; // Incrementa el contador de solicitudes totales
 							System.out.println(
 									"\n====================================================================================");
-							// Registra el tiempo de inicio del envío
-							long start = System.currentTimeMillis();
-							long latency = System.currentTimeMillis() - start; // Calcula la latencia
-							latencies.add(latency); // Agrega la latencia a la lista
-
-							// Almacena el tiempo de procesamiento de la respuesta
-							long processingTime = response.responseTime;
-							processingTimes.add(processingTime);
-
-							// Calcula el rendimiento de la red
-							long netPerformance = latency - processingTime;
-							networkPerformance.add(netPerformance);
-
-							// Almacena los valores de throughput y tasa de solicitudes no procesadas
-							throughput.add(response.throughput);
-							unprocessedRates.add(response.unprocessedRate);
-
-							// Muestra la respuesta del servidor y las métricas correspondientes
-							System.out.println("Server response: \n" + response.value + "\n");
-							System.out.print("latency = " + latency + "ms, ");
-							// Calcula el jitter si hay más de una medición de latencia
-							if (latencies.size() > 1) {
-								long jitter = calculateJitter();
-								System.out.print("jitter = " + jitter + "ms, ");
-							}
-							System.out.print("processing time = " + processingTime + "ms, ");
-							System.out.println("network performance = " + netPerformance + "ms");
-
-							// Incrementa los contadores de solicitudes exitosas y totales
-							successfulRequests++;
-							totalRequests++;
+							System.err.println("Error: \n" + ex.getMessage());
+							double missingRate = calculateMissingRate(); // Calcula la tasa de solicitudes no recibidas
+							System.out.println("Current missing rate = " + missingRate + "%");
 							System.out.println(
 									"====================================================================================");
 							System.out.print(prefix);
-						})
-						.exceptionally(ex -> {
-							System.err.println("Error sending message: \n" + ex.getMessage());
 							return null;
 						});
 			}
@@ -193,32 +200,28 @@ public class Client {
 	}
 
 	// Método que calcula la tasa de solicitudes no recibidas
-	// private static double calculateMissingRate() {
-	// // // Calcula el porcentaje de solicitudes fallidas
-	// // double missingRate = (double) (totalRequests - successfulRequests) /
-	// // totalRequests * 100;
-	// // missingRates.add(missingRate); // Almacena el valor de la tasa de
-	// solicitudes
-	// // fallidas
-	// // return missingRate;
-	// //// System.out.println("Missing Rate: " + missingRate + " %");
-	// // }
-	// return 0.0;
-	// }
+	private static double calculateMissingRate() {
+		// Calcula el porcentaje de solicitudes fallidas
+		double missingRate = (double) (totalRequests - successfulRequests) /
+				totalRequests * 100;
+		return missingRate;
+	}
 
 	// Método para generar un informe de rendimiento con las métricas recogidas
 	private static void generateReport() {
+		System.out.println("Total Requests = " + totalRequests);
+		System.out.println("Missing Rate (%) = " + calculateMissingRate() + "%");
 		System.out.println("\n--- Performance Report ---");
 		System.out.println(
-				"| Sent Message                                      | Latency (ms) | Processing Time (ms) | Net Performance (ms) | Jitter (ms) | Missing Rate (%) | Unprocessed Rate (%) | Throughput |");
+				"| Sent Message                                      | Latency (ms) | Processing Time (ms) | Net Performance (ms) | Jitter (ms) | Unprocessed Rate (%) | Throughput (requests/sec) |");
 		System.out.println(
 				"|---------------------------------------------------|--------------|----------------------|----------------------|-------------|------------------|--------------------|------------|");
 
 		// Itera sobre todas las métricas almacenadas y las imprime en formato de tabla
 		for (int i = 0; i < latencies.size(); i++) {
-			System.out.printf("| %-51s | %12d | %22d | %22d | %11d | %16.2f | %18.2f | %10.2f |\n",
+			System.out.printf("| %-51s | %12d | %22d | %22d | %11d | %18.2f | %10.2f |\n",
 					sentMessages.get(i), latencies.get(i), processingTimes.get(i), networkPerformance.get(i),
-					(i == 0 ? 0 : jitters.get(i - 1)), missingRates.get(i), unprocessedRates.get(i), throughput.get(i));
+					(i == 0 ? 0 : jitters.get(i - 1)), unprocessedRates.get(i), throughput.get(i));
 		}
 	}
 

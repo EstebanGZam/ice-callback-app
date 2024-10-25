@@ -6,7 +6,7 @@ import com.zeroc.Ice.Current;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.text.DecimalFormat;
+// import java.text.DecimalFormat;
 import java.util.HashMap;
 import java.util.Map;
 import java.math.BigInteger;
@@ -19,12 +19,12 @@ public class CallbackSenderI implements CallbackSender {
 	Map<String, CallbackReceiverPrx> clients = new HashMap<>();
 
 	// Formateador de decimales para mostrar los resultados con dos decimales
-	private final DecimalFormat df = new DecimalFormat("#.00");
+	// private final DecimalFormat df = new DecimalFormat("#.00");
 
 	// Método principal que recibe un mensaje (message), lo procesa y devuelve una
 	// respuesta
 	@Override
-	public Response sendMessage(String message, CallbackReceiverPrx proxy, Current current) {
+	public Response sendMessage(String message, long startTime, CallbackReceiverPrx proxy, Current current) {
 		// Crea un CompletableFuture para procesar el mensaje de manera asíncrona
 		// CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
 		long processTime; // Variable para almacenar el tiempo de procesamiento
@@ -73,7 +73,7 @@ public class CallbackSenderI implements CallbackSender {
 		// new Response(processTime, calculateThroughput(), calculateUnprocessedRate(),
 		// serverResponse));
 		// });
-		return new Response(processTime, calculateThroughput(), calculateUnprocessedRate(), serverResponse);
+		return new Response(startTime, processTime, calculateThroughput(), calculateUnprocessedRate(), serverResponse);
 	}
 
 	// Método para calcular la tasa de solicitudes no procesadas
@@ -81,7 +81,7 @@ public class CallbackSenderI implements CallbackSender {
 		// Calcula la tasa de solicitudes no procesadas como porcentaje
 		double unprocessedRate = (Server.getTotalRequests() - Server.getResolvedRequests())
 				/ (double) Server.getTotalRequests() * 100;
-		System.out.println("Unprocessed Rate: " + df.format(unprocessedRate) + " %");
+		System.out.println("Unprocessed Rate: " + unprocessedRate + " %");
 		return unprocessedRate;
 	}
 
@@ -91,7 +91,7 @@ public class CallbackSenderI implements CallbackSender {
 		// contrario, se calcula el throughput
 		double throughput = Server.getProcessTime() == 0 ? Double.NaN
 				: Server.getTotalRequests() / ((double) Server.getProcessTime() / 1000.0);
-		System.out.println("Throughput: " + df.format(throughput) + " request/s");
+		System.out.println("Throughput: " + throughput + " request/s");
 		return throughput;
 	}
 
@@ -156,7 +156,6 @@ public class CallbackSenderI implements CallbackSender {
 	// Método para manejar entradas no numéricas
 	private String handleNonNumericInput(String message, String sender) {
 		String output = ""; // Variable para almacenar el resultado
-		System.out.println("Command: " + message);
 		try {
 			if (message.startsWith("listifs")) { // Comando "listifs" para listar interfaces de red
 				String os = System.getProperty("os.name").toLowerCase(); // Obtiene el nombre del sistema operativo
