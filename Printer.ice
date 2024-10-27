@@ -2,7 +2,8 @@ module Demo
 {
     class Response
     {   
-        long startTime;
+        string messageIdentifier;
+        long requestedTime;
         long responseTime;
         double throughput;
         double unprocessedRate;
@@ -17,7 +18,7 @@ module Demo
     };
     interface CallbackSender
     {
-        Response sendMessage(string message, long startTime, CallbackReceiver* proxy);
+        Response sendMessage(string messageIdentifier, string message, long requestedTime, CallbackReceiver* proxy);
         void registerClient(string hostname, CallbackReceiver* proxy);
         void removeClient(string name);
     };

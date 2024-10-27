@@ -9,26 +9,21 @@ import java.net.Inet4Address;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Scanner;
+import java.util.UUID;
 
 public class Client {
 
 	// Escáner para leer la entrada del usuario
 	private static final Scanner scanner = new Scanner(System.in);
 
-	// Listas para almacenar métricas de rendimiento
-	private static final List<Long> latencies = new ArrayList<>();
-	private static final List<Long> processingTimes = new ArrayList<>();
-	private static final List<Long> networkPerformance = new ArrayList<>();
-	private static final List<Long> jitters = new ArrayList<>();
-	private static final List<String> sentMessages = new ArrayList<>();
-	private static final List<Double> unprocessedRates = new ArrayList<>();
-	private static final List<Double> throughput = new ArrayList<>();
-
 	// Variables para contar solicitudes exitosas y totales
 	private static int successfulRequests = 0;
 	private static int totalRequests = 0;
+
+	private static final LinkedHashMap<String, PerformanceMetricsForAMessage> messages = new LinkedHashMap<>();
 
 	public static void main(String[] args) {
 		List<String> extraArgs = new ArrayList<>();
@@ -129,35 +124,40 @@ public class Client {
 				System.out.println("Thank you for using our services. See you soon!");
 				sender.removeClient(hostname);
 			} else {
-				sentMessages.add(input); // Agrega el mensaje enviado a la lista
+				String messageIdentifier = generateMessageIdentifier();
+				messages.put(messageIdentifier, new PerformanceMetricsForAMessage(input));
 				// Envía el mensaje al servidor y recibe la respuesta
-				sender.sendMessageAsync(prefix + input, System.currentTimeMillis(), receiver)
+				sender.sendMessageAsync(messageIdentifier, prefix + input, System.currentTimeMillis(), receiver)
 						.thenAccept(
 								response -> {
+									PerformanceMetricsForAMessage performanceMetrics = messages.get(messageIdentifier);
 									System.out.println(
 											"\n====================================================================================");
 									// Calcula la latencia
-									long latency = System.currentTimeMillis() - response.startTime;
-									latencies.add(latency); // Agrega la latencia a la lista
+									long latency = System.currentTimeMillis() - response.requestedTime;
+									performanceMetrics.setLatency(latency);
 
 									// Almacena el tiempo de procesamiento de la respuesta
 									long processingTime = response.responseTime;
-									processingTimes.add(processingTime);
+									performanceMetrics.setProcessingTime(processingTime);
 
 									// Calcula el rendimiento de la red
 									long netPerformance = latency - processingTime;
-									networkPerformance.add(netPerformance);
+									performanceMetrics.setNetworkPerformance(netPerformance);
 
 									// Almacena los valores de throughput y tasa de solicitudes no procesadas
-									throughput.add(response.throughput);
-									unprocessedRates.add(response.unprocessedRate);
+									performanceMetrics.setThroughput(response.throughput);
+									performanceMetrics.setUnprocessedRate(response.unprocessedRate);
 
 									// Muestra la respuesta del servidor y las métricas correspondientes
 									System.out.println("Server response: \n" + response.value + "\n");
 									System.out.print("latency = " + latency + "ms, ");
 									// Calcula el jitter si hay más de una medición de latencia
-									if (latencies.size() > 1) {
-										long jitter = calculateJitter();
+									if (messages.size() < 2) {
+										performanceMetrics.setJitter(0.0);
+									} else {
+										Double jitter = calculateJitter();
+										performanceMetrics.setJitter(jitter);
 										System.out.print("jitter = " + jitter + "ms, ");
 									}
 									System.out.print("processing time = " + processingTime + "ms, ");
@@ -187,16 +187,36 @@ public class Client {
 		}
 	}
 
+	private static String generateMessageIdentifier() {
+		return UUID.randomUUID().toString();
+	}
+
 	// Método que calcula el jitter (variación de latencia) entre las solicitudes
-	private static long calculateJitter() {
-		long jitter = 0;
-		for (int i = 1; i < latencies.size(); i++) {
-			// Suma las diferencias absolutas entre latencias consecutivas
-			jitter += Math.abs(latencies.get(i) - latencies.get(i - 1));
+	private static double calculateJitter() {
+		double jitter = 0;
+		Long previousLatency = null;
+		int count = 0;
+
+		for (PerformanceMetricsForAMessage metrics : messages.values()) {
+			Long currentLatency = metrics.getLatency();
+
+			if (currentLatency == null) {
+				continue;
+			}
+
+			if (previousLatency != null) {
+				jitter += Math.abs(currentLatency - previousLatency);
+				count++;
+			}
+
+			previousLatency = currentLatency;
 		}
-		jitter /= (latencies.size() - 1); // Calcula el jitter promedio
-		jitters.add(jitter); // Almacena el valor de jitter
-		return jitter;
+
+		if (count == 0) {
+			return 0;
+		}
+
+		return jitter / count; // División de tipo double para precisión
 	}
 
 	// Método que calcula la tasa de solicitudes no recibidas
@@ -215,13 +235,23 @@ public class Client {
 		System.out.println(
 				"| Sent Message                                      | Latency (ms) | Processing Time (ms) | Net Performance (ms) | Jitter (ms) | Unprocessed Rate (%) | Throughput (requests/sec) |");
 		System.out.println(
-				"|---------------------------------------------------|--------------|----------------------|----------------------|-------------|------------------|--------------------|------------|");
+				"|---------------------------------------------------|--------------|----------------------|----------------------|-------------|------------------|--------------------|");
 
 		// Itera sobre todas las métricas almacenadas y las imprime en formato de tabla
-		for (int i = 0; i < latencies.size(); i++) {
-			System.out.printf("| %-51s | %12d | %22d | %22d | %11d | %18.2f | %10.2f |\n",
-					sentMessages.get(i), latencies.get(i), processingTimes.get(i), networkPerformance.get(i),
-					(i == 0 ? 0 : jitters.get(i - 1)), unprocessedRates.get(i), throughput.get(i));
+		for (PerformanceMetricsForAMessage metrics : messages.values()) {
+			if (metrics.areMetricsComplete()) {
+				System.out.printf("| %-51s | %12d | %22d | %22d | %11.2f | %18.2f | %10.2f |\n",
+						metrics.getMessage(),
+						metrics.getLatency(),
+						metrics.getProcessingTime(),
+						metrics.getNetworkPerformance(),
+						metrics.getJitter(),
+						metrics.getUnprocessedRate(),
+						metrics.getThroughput());
+			} else {
+				System.out.printf("| %-51s | %12s | %22s | %22s | %11s | %18s | %10s |\n",
+						metrics.getMessage(), "NA", "NA", "NA", "NA", "NA", "NA");
+			}
 		}
 	}
 

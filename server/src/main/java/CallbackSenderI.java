@@ -18,13 +18,11 @@ public class CallbackSenderI implements CallbackSender {
 	// Lista para guardar los clientes conectados al servidor
 	Map<String, CallbackReceiverPrx> clients = new HashMap<>();
 
-	// Formateador de decimales para mostrar los resultados con dos decimales
-	// private final DecimalFormat df = new DecimalFormat("#.00");
-
 	// Método principal que recibe un mensaje (message), lo procesa y devuelve una
 	// respuesta
 	@Override
-	public Response sendMessage(String message, long startTime, CallbackReceiverPrx proxy, Current current) {
+	public Response sendMessage(String messageIdentifier, String message, long shippingTime, CallbackReceiverPrx proxy,
+			Current current) {
 		// Crea un CompletableFuture para procesar el mensaje de manera asíncrona
 		// CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
 		long processTime; // Variable para almacenar el tiempo de procesamiento
@@ -45,15 +43,15 @@ public class CallbackSenderI implements CallbackSender {
 		registerClient(clientArray[1], proxy, current);
 
 		// La segunda parte del mensaje es la que se procesa
-		String messageToSend = msgArray[1];
+		String messageReceived = msgArray[1];
 		String serverResponse; // Respuesta del servidor
 
 		try {
 			// Intenta convertir el mensaje a un número y verifica si es un número natural
-			serverResponse = checkIfNaturalNumber(Integer.parseInt(messageToSend));
+			serverResponse = checkIfNaturalNumber(Integer.parseInt(messageReceived));
 		} catch (NumberFormatException e) {
 			// Si el mensaje no es un número, maneja la entrada no numérica
-			serverResponse = handleNonNumericInput(messageToSend, clientArray[1]);
+			serverResponse = handleNonNumericInput(messageReceived, clientArray[1]);
 		}
 
 		System.out.println(serverResponse); // Imprime la respuesta del servidor
@@ -67,13 +65,8 @@ public class CallbackSenderI implements CallbackSender {
 		// Acumula el tiempo total de procesamiento en el servidor
 		Server.setProcessTime(Server.getProcessTime() + processTime);
 
-		// Devuelve la respuesta final con el tiempo de procesamiento, throughput y tasa
-		// de solicitudes no procesadas
-		// proxy.updateStats(
-		// new Response(processTime, calculateThroughput(), calculateUnprocessedRate(),
-		// serverResponse));
-		// });
-		return new Response(startTime, processTime, calculateThroughput(), calculateUnprocessedRate(), serverResponse);
+		return new Response(messageIdentifier, shippingTime, processTime, calculateThroughput(),
+				calculateUnprocessedRate(), serverResponse);
 	}
 
 	// Método para calcular la tasa de solicitudes no procesadas
