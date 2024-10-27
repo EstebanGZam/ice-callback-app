@@ -18,7 +18,7 @@ module Demo
     };
     interface CallbackSender
     {
-        Response sendMessage(string messageIdentifier, string message, long requestedTime, CallbackReceiver* proxy);
+        ["amd"] Response sendMessage(string messageIdentifier, string message, long requestedTime, CallbackReceiver* proxy);
         void registerClient(string hostname, CallbackReceiver* proxy);
         void removeClient(string name);
     };

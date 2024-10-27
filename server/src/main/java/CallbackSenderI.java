@@ -6,9 +6,11 @@ import com.zeroc.Ice.Current;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-// import java.text.DecimalFormat;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.math.BigInteger;
 
 import Demo.InvalidOperationError;
@@ -17,56 +19,60 @@ public class CallbackSenderI implements CallbackSender {
 
 	// Lista para guardar los clientes conectados al servidor
 	Map<String, CallbackReceiverPrx> clients = new HashMap<>();
+	private final ExecutorService threadPool = Executors.newFixedThreadPool(6);
 
 	// Método principal que recibe un mensaje (message), lo procesa y devuelve una
 	// respuesta
 	@Override
-	public Response sendMessage(String messageIdentifier, String message, long shippingTime, CallbackReceiverPrx proxy,
+	public CompletableFuture<Response> sendMessageAsync(String messageIdentifier, String message, long shippingTime,
+			CallbackReceiverPrx proxy,
 			Current current) {
-		// Crea un CompletableFuture para procesar el mensaje de manera asíncrona
-		// CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
-		long processTime; // Variable para almacenar el tiempo de procesamiento
-		long start = System.currentTimeMillis(); // Registra el tiempo de inicio del procesamiento
+		return CompletableFuture.supplyAsync(() -> {
+			// Crea un CompletableFuture para procesar el mensaje de manera asíncrona
+			// CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+			long processTime; // Variable para almacenar el tiempo de procesamiento
+			long start = System.currentTimeMillis(); // Registra el tiempo de inicio del procesamiento
 
-		// Incrementa el contador de solicitudes totales en el servidor
-		Server.setTotalRequests(Server.getTotalRequests() + 1);
+			// Incrementa el contador de solicitudes totales en el servidor
+			Server.setTotalRequests(Server.getTotalRequests() + 1);
 
-		// Imprime un separador para cada nueva solicitud
-		System.out.println("====================================================================================");
-		System.out.println("Message: " + message); // Imprime el mensaje recibido
+			// Imprime un separador para cada nueva solicitud
+			System.out.println("====================================================================================");
+			System.out.println("Message: " + message); // Imprime el mensaje recibido
 
-		// Divide el mensaje en dos partes separadas por "=>"
-		String[] msgArray = message.split("=>");
+			// Divide el mensaje en dos partes separadas por "=>"
+			String[] msgArray = message.split("=>");
 
-		// La primera parte es la que registra el cliente junto con su proxy
-		String[] clientArray = msgArray[0].split(":");
-		registerClient(clientArray[1], proxy, current);
+			// La primera parte es la que registra el cliente junto con su proxy
+			String[] clientArray = msgArray[0].split(":");
+			registerClient(clientArray[1], proxy, current);
 
-		// La segunda parte del mensaje es la que se procesa
-		String messageReceived = msgArray[1];
-		String serverResponse; // Respuesta del servidor
+			// La segunda parte del mensaje es la que se procesa
+			String messageReceived = msgArray[1];
+			String serverResponse; // Respuesta del servidor
 
-		try {
-			// Intenta convertir el mensaje a un número y verifica si es un número natural
-			serverResponse = checkIfNaturalNumber(Integer.parseInt(messageReceived));
-		} catch (NumberFormatException e) {
-			// Si el mensaje no es un número, maneja la entrada no numérica
-			serverResponse = handleNonNumericInput(messageReceived, clientArray[1]);
-		}
+			try {
+				// Intenta convertir el mensaje a un número y verifica si es un número natural
+				serverResponse = checkIfNaturalNumber(Integer.parseInt(messageReceived));
+			} catch (NumberFormatException e) {
+				// Si el mensaje no es un número, maneja la entrada no numérica
+				serverResponse = handleNonNumericInput(messageReceived, clientArray[1]);
+			}
 
-		System.out.println(serverResponse); // Imprime la respuesta del servidor
+			System.out.println(serverResponse); // Imprime la respuesta del servidor
 
-		// Calcula el tiempo total de procesamiento
-		processTime = System.currentTimeMillis() - start;
+			// Calcula el tiempo total de procesamiento
+			processTime = System.currentTimeMillis() - start;
 
-		// Incrementa el contador de solicitudes resueltas en el servidor
-		Server.setResolvedRequests(Server.getResolvedRequests() + 1);
+			// Incrementa el contador de solicitudes resueltas en el servidor
+			Server.setResolvedRequests(Server.getResolvedRequests() + 1);
 
-		// Acumula el tiempo total de procesamiento en el servidor
-		Server.setProcessTime(Server.getProcessTime() + processTime);
+			// Acumula el tiempo total de procesamiento en el servidor
+			Server.setProcessTime(Server.getProcessTime() + processTime);
 
-		return new Response(messageIdentifier, shippingTime, processTime, calculateThroughput(),
-				calculateUnprocessedRate(), serverResponse);
+			return new Response(messageIdentifier, shippingTime, processTime, calculateThroughput(),
+					calculateUnprocessedRate(), serverResponse);
+		}, threadPool);
 	}
 
 	// Método para calcular la tasa de solicitudes no procesadas
