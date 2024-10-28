@@ -8,7 +8,6 @@ import com.zeroc.Ice.Util;
 import java.net.Inet4Address;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Scanner;
@@ -33,7 +32,6 @@ public class Client {
 			CallbackSenderPrx service = CallbackSenderPrx
 					.checkedCast(communicator.propertyToProxy("CallbackSender.Proxy"))
 					.ice_twoway().ice_secure(false);
-			System.out.println(service);
 			if (service == null) {
 				throw new Error("Invalid proxy");
 			}
@@ -49,7 +47,6 @@ public class Client {
 			throws UnknownHostException {
 		// Creación del adapter para el Cliente
 		ObjectAdapter adapter = communicator.createObjectAdapter("Callback.Client");
-		System.out.println("Adapter: " + Arrays.toString(adapter.getEndpoints()));
 
 		ObjectPrx proxy = adapter.add(new CallbackReceiverI(), Util.stringToIdentity("CallbackReceiver"));
 		adapter.activate();
@@ -57,7 +54,6 @@ public class Client {
 		// Obtener el proxy del receptor para recibir mensajes del servidor
 		CallbackReceiverPrx receiver = CallbackReceiverPrx
 				.uncheckedCast(proxy);
-		System.out.println(receiver);
 
 		// Interacción con el usuario
 		displayMenu(sender, receiver, communicator);
